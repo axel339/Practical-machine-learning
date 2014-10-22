@@ -1,0 +1,46 @@
+---
+title: "Practical Machine Learning Course Project"
+author: "A. Kuehn"
+date: "Tuesday, October 21, 2014"
+output: html_document
+---
+
+#### Synopsis
+
+In the present analysis, I used the random forest algorithm to predict the different activities performed in each case of the training set.
+One I filtered away non useful predictors (see R code below) I had 96 of them left to actually predict the "classe" variable.
+I also split the training set into 2 equal subsets so that I can get an accurate out-of-sample error using the cross-validation set. The final accuracy is ~ 99%.
+
+
+```{r}
+library(caret)
+
+# Loading the training and test sets
+trainset <- read.csv("pml-training.csv")
+testset <- read.csv("pml-testing.csv")
+
+# Elimination of near zero variance predictors and users/time of execution related variables
+nsv <- nearZeroVar(trainset)
+procTraining <- trainset[,-c(1:5,nsv)]
+
+# Data partition to get training and cross-validation set with equal number of cases
+inTrain <- createDataPartition(y=procTraining$classe, p=0.5,list=FALSE)
+training <- procTraining[inTrain,]
+crossv <- procTraining[-inTrain,]
+
+# Imputing the missing values with k-nearest neighbors method, and normalizing the data for the training set. Then applying to the training and cross-validation set the same pre-processing method
+preProc <- preProcess(training[,-95],method=c("knnImpute","center","scale"))
+train <- predict(preProc, training[,-95])
+crossvProc <- predict(preProc,crossv[,-95])
+
+# Model Fitting and out-of-sample accuracy measurement using the cross-validation set. Parameter "ntree" is set to 10 as it is sufficient to get a very high accuracy and cuts down on computing time.
+modFit <- train(training$classe ~ .,method="rf", ntree=10, data=train)
+confusionMatrix(crossv$classe,predict(modFit,crossvProc))
+
+# Now predicting the activities on the test set
+procTesting <- testset[,-c(1:5,nsv)]
+test <- predict(preProc, procTesting[,-95])
+predict(modFit,test)
+```
+
+
